@@ -63,11 +63,51 @@ class MusicServices {
     urlPattern: RegExp(r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})'),
   );
 
+  static final soundCloud = MusicService(
+    id: 'soundcloud',
+    name: 'SoundCloud',
+    iconName: 'soundcloud',
+    brandColor: Color(0xFFFF5500),
+    baseUrl: 'https://soundcloud.com',
+    urlPattern: RegExp(r'soundcloud\.com/[\w-]+/[\w-]+'),
+  );
+
+  static final deezer = MusicService(
+    id: 'deezer',
+    name: 'Deezer',
+    iconName: 'deezer',
+    brandColor: Color(0xFF00C7FD),
+    baseUrl: 'https://www.deezer.com',
+    urlPattern: RegExp(r'deezer\.com/track/(\d+)'),
+  );
+
+  static final amazonMusic = MusicService(
+    id: 'amazon_music',
+    name: 'Amazon Music',
+    iconName: 'amazon',
+    brandColor: Color(0xFF00A8E1),
+    baseUrl: 'https://music.amazon.com',
+    urlPattern: RegExp(r'music\.amazon\.com/[\w-]+/[\w-]+/(\w+)'),
+  );
+
+  static final tidal = MusicService(
+    id: 'tidal',
+    name: 'Tidal',
+    iconName: 'tidal',
+    brandColor: Color(0xFF000000),
+    baseUrl: 'https://listen.tidal.com',
+    urlPattern: RegExp(r'tidal\.com/track/(\d+)'),
+  );
+
   static List<MusicService> get allServices => [
         spotify,
         appleMusic,
         youtubeMusic,
         youtube,
+        soundCloud,
+        deezer,
+        amazonMusic,
+        tidal,
       ];
 
   static String generateLink(MusicService service, String trackId) {
@@ -80,6 +120,14 @@ class MusicServices {
         return 'https://music.youtube.com/watch?v=$trackId';
       case 'youtube':
         return 'https://youtu.be/$trackId';
+      case 'soundcloud':
+        return 'https://soundcloud.com/search?q=$trackId';
+      case 'deezer':
+        return 'https://www.deezer.com/track/$trackId';
+      case 'amazon_music':
+        return 'https://music.amazon.com/search?q=$trackId';
+      case 'tidal':
+        return 'https://listen.tidal.com/track/$trackId';
       default:
         return '';
     }

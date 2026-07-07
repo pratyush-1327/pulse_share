@@ -56,7 +56,8 @@ class ResultScreen extends StatelessWidget {
                     link,
                     link.service.id == MusicServices.spotify.id ||
                         link.service.id == MusicServices.appleMusic.id ||
-                        link.service.id == MusicServices.youtubeMusic.id,
+                        link.service.id == MusicServices.youtubeMusic.id ||
+                        link.service.id == MusicServices.youtube.id,
                   )),
               const SizedBox(height: 32),
               FilledButton(
@@ -164,6 +165,24 @@ class ResultScreen extends StatelessWidget {
   }
 
   IconData _getIconDataForService(String id) {
-    return Icons.music_note;
+    switch (id) {
+      case 'spotify':
+        return Icons.music_note;
+      case 'apple_music':
+        return Icons.apple;
+      case 'youtube_music':
+      case 'youtube':
+        return Icons.play_circle;
+      case 'soundcloud':
+        return Icons.cloud;
+      case 'deezer':
+        return Icons.headphones;
+      case 'amazon_music':
+        return Icons.shopping_bag;
+      case 'tidal':
+        return Icons.waves;
+      default:
+        return Icons.music_note;
+    }
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:music_share/features/share_handler/services/share_intent_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -58,8 +60,52 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
               ),
             ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => _showManualInput(context),
+              icon: const Icon(Icons.edit),
+              label: const Text('Manual Input'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(200, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showManualInput(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Music Link or Text'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Paste URL or song info here',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.pop(context);
+                context.read<ShareIntentService>().handleSharedText([text]);
+              }
+            },
+            child: const Text('Process'),
+          ),
+        ],
       ),
     );
   }

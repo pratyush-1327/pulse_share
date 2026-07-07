@@ -31,12 +31,20 @@ class ShareIntentService extends ChangeNotifier {
         if (value.isNotEmpty) {
           final file = value.first;
           _sharedFile = file;
-          debugPrint('getMediaStream: ${file.toMap()}');
-          _processSharedText(file.path);
+          
+          // Handle text shares (type = "text" or "url")
+          if (file.type == SharedMediaType.text || file.type == SharedMediaType.url) {
+            debugPrint('getMediaStream (text): ${file.path}');
+            handleSharedText([file.path]);
+          } else {
+            // Handle media files (images, videos, etc.)
+            debugPrint('getMediaStream (media): ${file.toMap()}');
+            handleSharedFile(file);
+          }
         }
       },
       onError: (err) {
-        debugPrint('getMediaDataStream error: $err');
+        debugPrint('getMediaStream error: $err');
       },
     );
 
@@ -44,44 +52,127 @@ class ShareIntentService extends ChangeNotifier {
       if (value.isNotEmpty) {
         final file = value.first;
         _sharedFile = file;
-        debugPrint('getInitialMedia: ${file.toMap()}');
-        _processSharedText(file.path);
+        
+        // Handle text shares (type = "text" or "url")
+        if (file.type == SharedMediaType.text || file.type == SharedMediaType.url) {
+          debugPrint('getInitialMedia (text): ${file.path}');
+          handleSharedText([file.path]);
+        } else {
+          // Handle media files (images, videos, etc.)
+          debugPrint('getInitialMedia (media): ${file.toMap()}');
+          handleSharedFile(file);
+        }
       }
     });
   }
 
   String? _extractUrl(String text) {
-    final match = RegExp(r'(https?:\/\/[^\s]+)').firstMatch(text);
-    return match?.group(1);
+    try {
+      final match = RegExp(r'(https?:\/\/[^\s]+)').firstMatch(text);
+      final url = match?.group(1);
+      debugPrint('ShareIntentService._extractUrl: text=$text, url=$url');
+      return url;
+    } catch (e) {
+      debugPrint('Error extracting URL: $e');
+      return null;
+    }
   }
 
   Map<String, String?> _extractMetadata(String rawText) {
     String? title;
     String? artist;
 
-    // Pattern 1: Double quotes for title and "by ... (on|http|$)" for artist
-    final quoteMatch = RegExp(r'"([^"]+)"').firstMatch(rawText);
-    if (quoteMatch != null) {
-      title = quoteMatch.group(1);
-      final artistMatch = RegExp(r'by\s+([^\n]+?)\s+(?:on|https?:\/\/|$)').firstMatch(rawText);
-      if (artistMatch != null) {
-        artist = artistMatch.group(1);
-      }
-    }
-
-    // Pattern 2: "Listen to ... by ... (on|http|$)" (Apple Music)
-    if (title == null) {
-      final listenToMatch = RegExp(r'Listen to\s+(.+?)\s+by\s+(.+?)\s+(?:on|https?:\/\/|$)').firstMatch(rawText);
+    try {
+      // Pattern 1: "Listen to ... by ..." (Apple Music, Spotify)
+      final listenToMatch = RegExp(r'(?i)listen\s+to\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
       if (listenToMatch != null) {
         title = listenToMatch.group(1);
         artist = listenToMatch.group(2);
       }
+
+      // Pattern 2: "Check out ... by ..."
+      if (title == null) {
+        final checkOutMatch = RegExp(r'(?i)check\s+out\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        if (checkOutMatch != null) {
+          title = checkOutMatch.group(1);
+          artist = checkOutMatch.group(2);
+        }
+      }
+
+      // Pattern 3: "Title - Artist" format
+      if (title == null) {
+        final dashMatch = RegExp(r'^(.+?)\s*-\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        if (dashMatch != null) {
+          title = dashMatch.group(1);
+          artist = dashMatch.group(2);
+        }
+      }
+
+      // Pattern 4: "Artist - Title" format
+      if (title == null) {
+        final artistDashMatch = RegExp(r'^(.+?)\s*-\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        if (artistDashMatch != null) {
+          artist = artistDashMatch.group(1);
+          title = artistDashMatch.group(2);
+        }
+      }
+
+      // Pattern 5: "Title by Artist" format
+      if (title == null) {
+        final byMatch = RegExp(r'^(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        if (byMatch != null) {
+          title = byMatch.group(1);
+          artist = byMatch.group(2);
+        }
+      }
+
+      // Pattern 6: "Artist: Title" format
+      if (title == null) {
+        final colonMatch = RegExp(r'^(.+?):\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        if (colonMatch != null) {
+          artist = colonMatch.group(1);
+          title = colonMatch.group(2);
+        }
+      }
+
+      // Pattern 7: Extract from URL path segments
+      if (title == null) {
+        final url = _extractUrl(rawText);
+        if (url != null) {
+          final pathTitle = _extractTitleFromUrl(url);
+          if (pathTitle != null) {
+            title = pathTitle;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error extracting metadata: $e');
     }
 
     return {
       'title': title?.trim(),
       'artist': artist?.trim(),
     };
+  }
+
+  String? _extractTitleFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final pathSegments = uri.pathSegments
+          .where((s) => s.isNotEmpty && !RegExp(r'^\d+$').hasMatch(s))
+          .toList();
+      if (pathSegments.isNotEmpty) {
+        final title = pathSegments.last
+            .replaceAll('-', ' ')
+            .replaceAll('_', ' ')
+            .replaceAll(RegExp(r'\.[^.]+$'), '');
+        return title.split(' ').map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1);
+        }).join(' ');
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _navigateTo(String routeName, {bool replace = false}) {
@@ -132,27 +223,57 @@ class ShareIntentService extends ChangeNotifier {
 
     _navigateTo('/processing');
 
-    final url = _extractUrl(rawText);
-    if (url == null) {
-      debugPrint('No valid URL found in text: $rawText');
-      _showSnackBar('Invalid URL');
-      _isProcessing = false;
-      notifyListeners();
-      _popScreen();
-      return;
-    }
-
-    final metadata = _extractMetadata(rawText);
-
     try {
+      final url = _extractUrl(rawText);
+      if (url == null) {
+        debugPrint('No valid URL found in text: $rawText');
+
+        // Try to extract metadata from text without URL
+        final metadata = _extractMetadata(rawText);
+        if (metadata['title'] != null || metadata['artist'] != null) {
+          debugPrint('Using text as song info: $metadata');
+          try {
+            await Future.delayed(const Duration(milliseconds: 500));
+            _currentLink = LinkParser.parse(
+              'https://example.com/music', // Dummy URL
+              trackName: metadata['title'],
+              artistName: metadata['artist'],
+            );
+          } catch (e) {
+            debugPrint('Error parsing text: $e');
+            _showSnackBar('Failed to process text');
+            _currentLink = null;
+          }
+        } else {
+          _showSnackBar('Invalid URL or text');
+        }
+
+        _isProcessing = false;
+        notifyListeners();
+
+        if (_currentLink != null) {
+          _navigateTo('/result', replace: true);
+        } else {
+          _popScreen();
+        }
+        return;
+      }
+
+      debugPrint('Extracted URL: $url');
+      final metadata = _extractMetadata(rawText);
+      debugPrint('Extracted metadata: $metadata');
+
       await Future.delayed(const Duration(milliseconds: 500));
       _currentLink = LinkParser.parse(
         url,
         trackName: metadata['title'],
         artistName: metadata['artist'],
       );
+      debugPrint('Parsed link: ${_currentLink?.displayTitle}');
+      debugPrint('Source service: ${_currentLink?.sourceService?.name}');
+      debugPrint('Available links: ${_currentLink?.availableLinks.length}');
     } catch (e) {
-      debugPrint('Error parsing link: $e');
+      debugPrint('Error in _processSharedText: $e');
       _showSnackBar('Failed to process link');
       _currentLink = null;
     } finally {
