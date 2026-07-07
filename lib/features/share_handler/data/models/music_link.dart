@@ -21,6 +21,11 @@ class MusicLink {
 
   bool get hasMetadata => trackName != null || artistName != null;
 
+  ServiceLink get sourceLink {
+    final match = availableLinks.where((l) => l.service.id == sourceService?.id);
+    return match.isNotEmpty ? match.first : availableLinks.first;
+  }
+
   String get displayTitle {
     if (trackName != null && artistName != null) {
       return '$trackName - $artistName';

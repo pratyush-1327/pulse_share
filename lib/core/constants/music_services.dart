@@ -104,10 +104,7 @@ class MusicServices {
         appleMusic,
         youtubeMusic,
         youtube,
-        soundCloud,
-        deezer,
         amazonMusic,
-        tidal,
       ];
 
   static String generateLink(MusicService service, String trackId) {
@@ -140,5 +137,25 @@ class MusicServices {
       }
     }
     return null;
+  }
+
+  static String generateSearchLink(MusicService service, String? trackName, String? artistName) {
+    final query = Uri.encodeComponent(
+      [trackName, artistName].where((s) => s != null && s.isNotEmpty).join(' '),
+    );
+    switch (service.id) {
+      case 'spotify':
+        return 'https://open.spotify.com/search/$query';
+      case 'apple_music':
+        return 'https://music.apple.com/search?term=$query';
+      case 'youtube_music':
+        return 'https://music.youtube.com/search?q=$query';
+      case 'youtube':
+        return 'https://www.youtube.com/results?search_query=$query';
+      case 'amazon_music':
+        return 'https://music.amazon.com/search/$query';
+      default:
+        return '';
+    }
   }
 }

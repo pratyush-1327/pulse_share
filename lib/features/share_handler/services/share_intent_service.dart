@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/music_services.dart';
 import '../data/models/music_link.dart';
 import '../data/repositories/link_parser.dart';
+import '../data/metadata_fetcher.dart';
+import '../data/song_link_api.dart';
+import '../data/platform_resolver.dart';
 
 class ShareIntentService extends ChangeNotifier {
   ShareIntentService() {
@@ -84,7 +87,7 @@ class ShareIntentService extends ChangeNotifier {
 
     try {
       // Pattern 1: "Listen to ... by ..." (Apple Music, Spotify)
-      final listenToMatch = RegExp(r'(?i)listen\s+to\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+      final listenToMatch = RegExp(r'listen\s+to\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
       if (listenToMatch != null) {
         title = listenToMatch.group(1);
         artist = listenToMatch.group(2);
@@ -92,7 +95,7 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 2: "Check out ... by ..."
       if (title == null) {
-        final checkOutMatch = RegExp(r'(?i)check\s+out\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final checkOutMatch = RegExp(r'check\s+out\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
         if (checkOutMatch != null) {
           title = checkOutMatch.group(1);
           artist = checkOutMatch.group(2);
@@ -101,7 +104,7 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 3: "Title - Artist" format
       if (title == null) {
-        final dashMatch = RegExp(r'^(.+?)\s*-\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final dashMatch = RegExp(r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
         if (dashMatch != null) {
           title = dashMatch.group(1);
           artist = dashMatch.group(2);
@@ -110,7 +113,7 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 4: "Artist - Title" format
       if (title == null) {
-        final artistDashMatch = RegExp(r'^(.+?)\s*-\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final artistDashMatch = RegExp(r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
         if (artistDashMatch != null) {
           artist = artistDashMatch.group(1);
           title = artistDashMatch.group(2);
@@ -119,7 +122,7 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 5: "Title by Artist" format
       if (title == null) {
-        final byMatch = RegExp(r'^(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final byMatch = RegExp(r'^(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
         if (byMatch != null) {
           title = byMatch.group(1);
           artist = byMatch.group(2);
@@ -134,17 +137,6 @@ class ShareIntentService extends ChangeNotifier {
           title = colonMatch.group(2);
         }
       }
-
-      // Pattern 7: Extract from URL path segments
-      if (title == null) {
-        final url = _extractUrl(rawText);
-        if (url != null) {
-          final pathTitle = _extractTitleFromUrl(url);
-          if (pathTitle != null) {
-            title = pathTitle;
-          }
-        }
-      }
     } catch (e) {
       debugPrint('Error extracting metadata: $e');
     }
@@ -153,26 +145,6 @@ class ShareIntentService extends ChangeNotifier {
       'title': title?.trim(),
       'artist': artist?.trim(),
     };
-  }
-
-  String? _extractTitleFromUrl(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final pathSegments = uri.pathSegments
-          .where((s) => s.isNotEmpty && !RegExp(r'^\d+$').hasMatch(s))
-          .toList();
-      if (pathSegments.isNotEmpty) {
-        final title = pathSegments.last
-            .replaceAll('-', ' ')
-            .replaceAll('_', ' ')
-            .replaceAll(RegExp(r'\.[^.]+$'), '');
-        return title.split(' ').map((word) {
-          if (word.isEmpty) return word;
-          return word[0].toUpperCase() + word.substring(1);
-        }).join(' ');
-      }
-    } catch (_) {}
-    return null;
   }
 
   void _navigateTo(String routeName, {bool replace = false}) {
@@ -260,15 +232,100 @@ class ShareIntentService extends ChangeNotifier {
       }
 
       debugPrint('Extracted URL: $url');
-      final metadata = _extractMetadata(rawText);
-      debugPrint('Extracted metadata: $metadata');
 
-      await Future.delayed(const Duration(milliseconds: 500));
-      _currentLink = LinkParser.parse(
-        url,
-        trackName: metadata['title'],
-        artistName: metadata['artist'],
-      );
+      // Step 1: Try to get direct links from SongLink API
+      debugPrint('Fetching direct links from SongLink API...');
+      final songLinkResult = await SongLinkApiService.fetchLinks(url);
+
+      if (songLinkResult != null && songLinkResult.platformUrls.isNotEmpty) {
+        debugPrint('SongLink API returned ${songLinkResult.platformUrls.length} platforms');
+        final sourceService = MusicServices.detectService(url);
+        final trackId = sourceService?.extractIdFromUrl(url);
+        final trackName = songLinkResult.title;
+        final artistName = songLinkResult.artistName;
+
+        final availableLinks = <ServiceLink>[];
+        final addedIds = <String>{};
+        for (final entry in songLinkResult.platformUrls.entries) {
+          for (final service in MusicServices.allServices) {
+            if (service.id == entry.key) {
+              availableLinks.add(ServiceLink(service: service, url: entry.value));
+              addedIds.add(service.id);
+              break;
+            }
+          }
+        }
+
+        // For platforms missing from Odesli, try PlatformResolver
+        for (final service in MusicServices.allServices) {
+          if (addedIds.contains(service.id)) continue;
+          final resolved = await PlatformResolver.resolvePlatform(
+            service.id, trackName, artistName,
+          );
+          if (resolved != null) {
+            availableLinks.add(ServiceLink(service: service, url: resolved));
+            addedIds.add(service.id);
+            debugPrint('PlatformResolver: Found ${service.id} -> $resolved');
+          }
+        }
+
+        // Only add services that we have direct links for — no search URLs
+        // If a platform has no direct link, just leave it out
+        debugPrint('Final available platforms (${availableLinks.length}): '
+            '${availableLinks.map((l) => l.service.id).join(', ')}');
+
+        _currentLink = MusicLink(
+          originalUrl: url,
+          sourceService: sourceService,
+          trackId: trackId,
+          trackName: songLinkResult.title,
+          artistName: songLinkResult.artistName,
+          availableLinks: availableLinks,
+        );
+      } else {
+        debugPrint('SongLink API failed, resolving via PlatformResolver...');
+        String? trackName;
+        String? artistName;
+
+        final textMetadata = _extractMetadata(rawText);
+        trackName = textMetadata['title'];
+        artistName = textMetadata['artist'];
+
+        if (trackName == null && artistName == null) {
+          final pageMetadata = await MetadataFetcher.fetchMetadata(url);
+          trackName = pageMetadata['title'];
+          artistName = pageMetadata['artist'];
+        }
+
+        final link = LinkParser.parse(url, trackName: trackName, artistName: artistName);
+        if (link.sourceService != null) {
+          final availableLinks = <ServiceLink>[link.sourceLink];
+          final addedIds = {link.sourceService!.id};
+
+          for (final service in MusicServices.allServices) {
+            if (addedIds.contains(service.id)) continue;
+            final resolved = await PlatformResolver.resolvePlatform(
+              service.id, trackName, artistName,
+            );
+            if (resolved != null) {
+              availableLinks.add(ServiceLink(service: service, url: resolved));
+              addedIds.add(service.id);
+            }
+          }
+
+          _currentLink = MusicLink(
+            originalUrl: url,
+            sourceService: link.sourceService,
+            trackId: link.trackId,
+            trackName: trackName,
+            artistName: artistName,
+            availableLinks: availableLinks,
+          );
+        } else {
+          _currentLink = link;
+        }
+      }
+
       debugPrint('Parsed link: ${_currentLink?.displayTitle}');
       debugPrint('Source service: ${_currentLink?.sourceService?.name}');
       debugPrint('Available links: ${_currentLink?.availableLinks.length}');
