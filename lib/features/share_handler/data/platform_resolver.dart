@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'spotify_config.dart';
 
 class PlatformResolver {
   /// Maps our service IDs to their direct link patterns
@@ -23,7 +24,7 @@ class PlatformResolver {
   ) async {
     if (trackName == null && artistName == null) return null;
 
-    final query = [artistName, trackName]
+    final query = [trackName, artistName]
         .where((s) => s != null && s.isNotEmpty)
         .join(' ');
 
@@ -136,81 +137,67 @@ class PlatformResolver {
     }
   }
 
-  /// Spotify: Use search page + embedded JSON-LD or Next.js data
+  /// Spotify: Search + scrape for track URIs
   static Future<String?> _searchSpotify(String query) async {
     try {
       final encoded = Uri.encodeComponent(query);
       final uri = Uri.parse('https://open.spotify.com/search/$encoded');
       debugPrint('SpotifyScrape: Fetching $uri');
       final response = await http.get(uri, headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        'Accept': 'text/html',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; SM-S908E) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cookie': 'sp_t=; sp_landing=;',
       });
       if (response.statusCode != 200) return null;
 
       final html = response.body;
 
-      // Search for track URIs in all JavaScript/text content
-      final uriMatches = RegExp(r'spotify:track:([a-zA-Z0-9]+)').allMatches(html);
+      // Method 1: Find spotify:track: URIs anywhere in the page
+      final uriMatches = RegExp(r'spotify[\s]*:[\s]*track[\s]*:[\s]*([a-zA-Z0-9]+)')
+          .allMatches(html);
       if (uriMatches.isNotEmpty) {
-        final ids = uriMatches.map((m) => m.group(1)).toSet().toList();
+        final ids = uriMatches.map((m) => m.group(1)!.trim()).toSet().toList();
         if (ids.isNotEmpty) {
           final link = 'https://open.spotify.com/track/${ids[0]}';
-          debugPrint('SpotifyScrape: Found track URIs, using first -> $link');
+          debugPrint('SpotifyScrape: Found via URI -> $link');
           return link;
         }
       }
 
-      // Try JSON-LD
-      final jsonLdMatch = RegExp(
-        r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>',
-        caseSensitive: false,
-        dotAll: true,
-      ).firstMatch(html);
-      if (jsonLdMatch != null) {
-        try {
-          final jsonLd = jsonDecode(jsonLdMatch.group(1)!) as Map<String, dynamic>;
-          final url = jsonLd['url'] as String?;
-          if (url != null && url.contains('open.spotify.com/track/')) {
-            debugPrint('SpotifyScrape: Found via JSON-LD -> $url');
-            return url;
-          }
-        } catch (_) {}
-      }
-
-      // Try Next.js data
-      final nextMatch = RegExp(
-        r'<script[^>]+id="__NEXT_DATA__"[^>]*>(.*?)</script>',
-        caseSensitive: false,
-        dotAll: true,
-      ).firstMatch(html);
-      if (nextMatch != null) {
-        try {
-          final nextData = jsonDecode(nextMatch.group(1)!) as Map<String, dynamic>;
-          final jsonStr = jsonEncode(nextData);
-          final trackMatch = RegExp(r'"uri"\s*:\s*"spotify:track:([a-zA-Z0-9]+)"').firstMatch(jsonStr);
-          if (trackMatch != null) {
-            final link = 'https://open.spotify.com/track/${trackMatch.group(1)}';
-            debugPrint('SpotifyScrape: Found via Next.js data -> $link');
-            return link;
-          }
-        } catch (_) {}
-      }
-
-      // Try Open Graph tags
-      final ogMatch = RegExp(
-        r'<meta[^>]+property="og:url"[^>]+content="([^"]+)"',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (ogMatch != null) {
-        final ogUrl = ogMatch.group(1)!;
-        if (ogUrl.contains('open.spotify.com/track/')) {
-          debugPrint('SpotifyScrape: Found via OG -> $ogUrl');
-          return ogUrl;
+      // Method 2: Find track subdomain URLs
+      final httpsMatches = RegExp(r'https://open\.spotify\.com/track/([a-zA-Z0-9]+)')
+          .allMatches(html);
+      if (httpsMatches.isNotEmpty) {
+        final ids = httpsMatches.map((m) => m.group(1)!.trim()).toSet().toList();
+        if (ids.isNotEmpty) {
+          final link = 'https://open.spotify.com/track/${ids[0]}';
+          debugPrint('SpotifyScrape: Found via HTTPS URL -> $link');
+          return link;
         }
       }
 
-      debugPrint('SpotifyScrape: No track found in page');
+      // Method 3: Look for JSON data with track info
+      // Spotify embeds data in various script formats
+      final jsonDataMatches = RegExp(
+        r'"uri"\s*:\s*"spotify:track:([a-zA-Z0-9]+)"',
+        caseSensitive: false,
+      ).allMatches(html);
+      if (jsonDataMatches.isNotEmpty) {
+        final ids = jsonDataMatches.map((m) => m.group(1)!.trim()).toSet().toList();
+        if (ids.isNotEmpty) {
+          final link = 'https://open.spotify.com/track/${ids[0]}';
+          debugPrint('SpotifyScrape: Found via JSON uri -> $link');
+          return link;
+        }
+      }
+
+      // Method 4: Check page title for clues
+      final titleMatch = RegExp(r'<title>(.*?)</title>', caseSensitive: false, dotAll: true)
+          .firstMatch(html);
+      debugPrint('SpotifyScrape: Page title: ${titleMatch?.group(1)?.trim() ?? "not found"}');
+
+      debugPrint('SpotifyScrape: No track found (${html.length} bytes)');
       return null;
     } catch (e) {
       debugPrint('SpotifyScrape error: $e');
