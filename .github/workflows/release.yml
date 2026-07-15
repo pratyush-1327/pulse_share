@@ -38,13 +38,13 @@ jobs:
         run: sed -i '/org.gradle.java.home/d' android/gradle.properties
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-*-release.apk
 
   create-release:
     name: Create GitHub Release
@@ -63,7 +63,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android-assets/app-release.apk
+          files: android-assets/app-*-release.apk
           draft: false
           prerelease: false
         env:
