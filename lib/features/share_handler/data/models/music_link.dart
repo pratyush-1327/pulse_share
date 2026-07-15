@@ -46,7 +46,7 @@ class MusicLink {
       buffer.writeln('🔗 ${link.service.name}: ${link.url}');
     }
     buffer.writeln();
-    buffer.writeln('Shared via PulseShare');
+    buffer.writeln('Shared via PulseShare: https://github.com/pratyush-1327/pulse_share');
 
     return buffer.toString();
   }

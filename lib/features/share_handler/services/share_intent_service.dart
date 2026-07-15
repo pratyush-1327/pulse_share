@@ -392,7 +392,7 @@ class ShareIntentService extends ChangeNotifier {
   Future<void> shareIndividualLink(ServiceLink link) async {
     if (_currentLink == null) return;
 
-    final message = '🎵 ${_currentLink!.displayTitle}\n🔗 ${link.service.name}: ${link.url}\n\nShared via PulseShare';
+    final message = '🎵 ${_currentLink!.displayTitle}\n🔗 ${link.service.name}: ${link.url}\n\nShared via PulseShare: https://github.com/pratyush-1327/pulse_share';
     try {
       final result = await SharePlus.instance.share(ShareParams(text: message));
       if (result.status == ShareResultStatus.success) {
