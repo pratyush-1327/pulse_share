@@ -22,7 +22,9 @@ class MusicLink {
   bool get hasMetadata => trackName != null || artistName != null;
 
   ServiceLink get sourceLink {
-    final match = availableLinks.where((l) => l.service.id == sourceService?.id);
+    final match = availableLinks.where(
+      (l) => l.service.id == sourceService?.id,
+    );
     return match.isNotEmpty ? match.first : availableLinks.first;
   }
 
@@ -46,7 +48,7 @@ class MusicLink {
       buffer.writeln('🔗 ${link.service.name}: ${link.url}');
     }
     buffer.writeln();
-    buffer.writeln('Shared via PulseShare: https://github.com/pratyush-1327/pulse_share');
+    buffer.writeln('Shared via http://tiny.cc/pulse_share');
 
     return buffer.toString();
   }
@@ -60,10 +62,7 @@ class ServiceLink {
   final MusicService service;
   final String url;
 
-  const ServiceLink({
-    required this.service,
-    required this.url,
-  });
+  const ServiceLink({required this.service, required this.url});
 
   bool get isAvailable => url.isNotEmpty;
 }

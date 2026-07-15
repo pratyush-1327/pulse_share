@@ -34,9 +34,10 @@ class ShareIntentService extends ChangeNotifier {
         if (value.isNotEmpty) {
           final file = value.first;
           _sharedFile = file;
-          
+
           // Handle text shares (type = "text" or "url")
-          if (file.type == SharedMediaType.text || file.type == SharedMediaType.url) {
+          if (file.type == SharedMediaType.text ||
+              file.type == SharedMediaType.url) {
             debugPrint('getMediaStream (text): ${file.path}');
             handleSharedText([file.path]);
           } else {
@@ -55,9 +56,10 @@ class ShareIntentService extends ChangeNotifier {
       if (value.isNotEmpty) {
         final file = value.first;
         _sharedFile = file;
-        
+
         // Handle text shares (type = "text" or "url")
-        if (file.type == SharedMediaType.text || file.type == SharedMediaType.url) {
+        if (file.type == SharedMediaType.text ||
+            file.type == SharedMediaType.url) {
           debugPrint('getInitialMedia (text): ${file.path}');
           handleSharedText([file.path]);
         } else {
@@ -87,7 +89,10 @@ class ShareIntentService extends ChangeNotifier {
 
     try {
       // Pattern 1: "Listen to ... by ..." (Apple Music, Spotify)
-      final listenToMatch = RegExp(r'listen\s+to\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
+      final listenToMatch = RegExp(
+        r'listen\s+to\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)',
+        caseSensitive: false,
+      ).firstMatch(rawText);
       if (listenToMatch != null) {
         title = listenToMatch.group(1);
         artist = listenToMatch.group(2);
@@ -95,7 +100,10 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 2: "Check out ... by ..."
       if (title == null) {
-        final checkOutMatch = RegExp(r'check\s+out\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
+        final checkOutMatch = RegExp(
+          r'check\s+out\s+(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)',
+          caseSensitive: false,
+        ).firstMatch(rawText);
         if (checkOutMatch != null) {
           title = checkOutMatch.group(1);
           artist = checkOutMatch.group(2);
@@ -104,7 +112,9 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 3: "Title - Artist" format
       if (title == null) {
-        final dashMatch = RegExp(r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final dashMatch = RegExp(
+          r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)',
+        ).firstMatch(rawText);
         if (dashMatch != null) {
           title = dashMatch.group(1);
           artist = dashMatch.group(2);
@@ -113,7 +123,9 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 4: "Artist - Title" format
       if (title == null) {
-        final artistDashMatch = RegExp(r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final artistDashMatch = RegExp(
+          r'^(.+?)\s*[-–]\s*(.+?)(?:\s+on\s+|\s+https?:|$)',
+        ).firstMatch(rawText);
         if (artistDashMatch != null) {
           artist = artistDashMatch.group(1);
           title = artistDashMatch.group(2);
@@ -122,7 +134,10 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 5: "Title by Artist" format
       if (title == null) {
-        final byMatch = RegExp(r'^(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)', caseSensitive: false).firstMatch(rawText);
+        final byMatch = RegExp(
+          r'^(.+?)\s+by\s+(.+?)(?:\s+on\s+|\s+https?:|$)',
+          caseSensitive: false,
+        ).firstMatch(rawText);
         if (byMatch != null) {
           title = byMatch.group(1);
           artist = byMatch.group(2);
@@ -131,7 +146,9 @@ class ShareIntentService extends ChangeNotifier {
 
       // Pattern 6: "Artist: Title" format
       if (title == null) {
-        final colonMatch = RegExp(r'^(.+?):\s*(.+?)(?:\s+on\s+|\s+https?:|$)').firstMatch(rawText);
+        final colonMatch = RegExp(
+          r'^(.+?):\s*(.+?)(?:\s+on\s+|\s+https?:|$)',
+        ).firstMatch(rawText);
         if (colonMatch != null) {
           artist = colonMatch.group(1);
           title = colonMatch.group(2);
@@ -141,10 +158,7 @@ class ShareIntentService extends ChangeNotifier {
       debugPrint('Error extracting metadata: $e');
     }
 
-    return {
-      'title': title?.trim(),
-      'artist': artist?.trim(),
-    };
+    return {'title': title?.trim(), 'artist': artist?.trim()};
   }
 
   void _navigateTo(String routeName, {bool replace = false}) {
@@ -238,7 +252,9 @@ class ShareIntentService extends ChangeNotifier {
       final songLinkResult = await SongLinkApiService.fetchLinks(url);
 
       if (songLinkResult != null && songLinkResult.platformUrls.isNotEmpty) {
-        debugPrint('SongLink API returned ${songLinkResult.platformUrls.length} platforms');
+        debugPrint(
+          'SongLink API returned ${songLinkResult.platformUrls.length} platforms',
+        );
         final sourceService = MusicServices.detectService(url);
         final trackId = sourceService?.extractIdFromUrl(url);
         final trackName = songLinkResult.title;
@@ -249,7 +265,9 @@ class ShareIntentService extends ChangeNotifier {
         for (final entry in songLinkResult.platformUrls.entries) {
           for (final service in MusicServices.allServices) {
             if (service.id == entry.key) {
-              availableLinks.add(ServiceLink(service: service, url: entry.value));
+              availableLinks.add(
+                ServiceLink(service: service, url: entry.value),
+              );
               addedIds.add(service.id);
               break;
             }
@@ -260,14 +278,20 @@ class ShareIntentService extends ChangeNotifier {
         for (final service in MusicServices.allServices) {
           if (addedIds.contains(service.id)) continue;
           final resolved = await PlatformResolver.resolvePlatform(
-            service.id, trackName, artistName,
+            service.id,
+            trackName,
+            artistName,
           );
           if (resolved != null) {
             availableLinks.add(ServiceLink(service: service, url: resolved));
             addedIds.add(service.id);
             debugPrint('PlatformResolver: Found ${service.id} -> $resolved');
           } else if (trackName != null && trackName.isNotEmpty) {
-            final searchUrl = MusicServices.generateSearchLink(service, trackName, artistName);
+            final searchUrl = MusicServices.generateSearchLink(
+              service,
+              trackName,
+              artistName,
+            );
             if (searchUrl.isNotEmpty) {
               availableLinks.add(ServiceLink(service: service, url: searchUrl));
               addedIds.add(service.id);
@@ -275,8 +299,10 @@ class ShareIntentService extends ChangeNotifier {
           }
         }
 
-        debugPrint('Final available platforms (${availableLinks.length}): '
-            '${availableLinks.map((l) => l.service.id).join(', ')}');
+        debugPrint(
+          'Final available platforms (${availableLinks.length}): '
+          '${availableLinks.map((l) => l.service.id).join(', ')}',
+        );
 
         _currentLink = MusicLink(
           originalUrl: url,
@@ -301,7 +327,11 @@ class ShareIntentService extends ChangeNotifier {
           artistName = pageMetadata['artist'];
         }
 
-        final link = LinkParser.parse(url, trackName: trackName, artistName: artistName);
+        final link = LinkParser.parse(
+          url,
+          trackName: trackName,
+          artistName: artistName,
+        );
         if (link.sourceService != null) {
           final availableLinks = <ServiceLink>[link.sourceLink];
           final addedIds = {link.sourceService!.id};
@@ -309,15 +339,23 @@ class ShareIntentService extends ChangeNotifier {
           for (final service in MusicServices.allServices) {
             if (addedIds.contains(service.id)) continue;
             final resolved = await PlatformResolver.resolvePlatform(
-              service.id, trackName, artistName,
+              service.id,
+              trackName,
+              artistName,
             );
             if (resolved != null) {
               availableLinks.add(ServiceLink(service: service, url: resolved));
               addedIds.add(service.id);
             } else if (trackName != null && trackName.isNotEmpty) {
-              final searchUrl = MusicServices.generateSearchLink(service, trackName, artistName);
+              final searchUrl = MusicServices.generateSearchLink(
+                service,
+                trackName,
+                artistName,
+              );
               if (searchUrl.isNotEmpty) {
-                availableLinks.add(ServiceLink(service: service, url: searchUrl));
+                availableLinks.add(
+                  ServiceLink(service: service, url: searchUrl),
+                );
                 addedIds.add(service.id);
               }
             }
@@ -392,7 +430,8 @@ class ShareIntentService extends ChangeNotifier {
   Future<void> shareIndividualLink(ServiceLink link) async {
     if (_currentLink == null) return;
 
-    final message = '🎵 ${_currentLink!.displayTitle}\n🔗 ${link.service.name}: ${link.url}\n\nShared via PulseShare: https://github.com/pratyush-1327/pulse_share';
+    final message =
+        '🎵 ${_currentLink!.displayTitle}\n🔗 ${link.service.name}: ${link.url}\n\nShared via http://tiny.cc/pulse_share';
     try {
       final result = await SharePlus.instance.share(ShareParams(text: message));
       if (result.status == ShareResultStatus.success) {
