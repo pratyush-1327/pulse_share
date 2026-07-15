@@ -3,7 +3,7 @@ name: Build and Release Flutter App
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
 
 permissions:
   contents: write
