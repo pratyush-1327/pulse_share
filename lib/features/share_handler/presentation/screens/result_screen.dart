@@ -152,9 +152,9 @@ class ResultScreen extends StatelessWidget {
       title: Text(link.service.name),
       subtitle: Text(link.url),
       trailing: OutlinedButton.icon(
-        onPressed: () => context.read<ShareIntentService>().openLinkInService(link.service),
-        icon: const Icon(Icons.open_in_new),
-        label: const Text('Open'),
+        onPressed: () => context.read<ShareIntentService>().shareIndividualLink(link),
+        icon: const Icon(Icons.share),
+        label: const Text('Share'),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(64, 32),
           padding: const EdgeInsets.symmetric(horizontal: 8),

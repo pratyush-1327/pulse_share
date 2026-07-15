@@ -389,6 +389,21 @@ class ShareIntentService extends ChangeNotifier {
     }
   }
 
+  Future<void> shareIndividualLink(ServiceLink link) async {
+    if (_currentLink == null) return;
+
+    final message = '🎵 ${_currentLink!.displayTitle}\n🔗 ${link.service.name}: ${link.url}\n\nShared via Music Share';
+    try {
+      final result = await SharePlus.instance.share(ShareParams(text: message));
+      if (result.status == ShareResultStatus.success) {
+        debugPrint('Shared individual link successfully');
+      }
+    } catch (e) {
+      debugPrint('Error sharing individual link: $e');
+      _showSnackBar('Failed to share link');
+    }
+  }
+
   void _showSnackBar(String message) {
     debugPrint('SnackBar: $message');
   }
