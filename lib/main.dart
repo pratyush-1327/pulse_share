@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
-import 'features/share_handler/presentation/screens/home_screen.dart';
-import 'features/share_handler/presentation/screens/processing_screen.dart';
-import 'features/share_handler/presentation/screens/result_screen.dart';
-import 'features/share_handler/services/share_intent_service.dart';
+import 'features/settings/preferences_service.dart';
+import 'features/presentation/share_intent_manager.dart';
+import 'features/presentation/screens/home_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  ShareIntentManager.initialize();
   runApp(const PulseShareApp());
 }
 
@@ -18,26 +19,17 @@ class PulseShareApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => ShareIntentService(),
+          create: (_) => PreferencesService(),
         ),
       ],
-      child: Builder(
-        builder: (context) {
-          return MaterialApp(
-            navigatorKey: context.read<ShareIntentService>().navigatorKey,
-            title: 'PulseShare',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
-            initialRoute: '/',
-            routes: {
-              '/': (_) => const HomeScreen(),
-              '/processing': (_) => const ProcessingScreen(),
-              '/result': (_) => const ResultScreen(),
-            },
-          );
-        },
+      child: MaterialApp(
+        navigatorKey: ShareIntentManager.navigatorKey,
+        title: 'PulseShare',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
+        home: const HomeScreen(),
       ),
     );
   }
