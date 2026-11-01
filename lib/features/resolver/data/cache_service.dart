@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/track_info.dart';
 
 class CacheService {
@@ -16,11 +17,17 @@ class CacheService {
       final prefs = await SharedPreferences.getInstance();
       final cacheKey = '$_trackCachePrefix${_normalizeKey(key)}';
       final jsonString = prefs.getString(cacheKey);
-      if (jsonString == null) return null;
+      if (jsonString == null) {
+        talker.debug('CacheService: Miss for key "$key"');
+        return null;
+      }
 
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      return TrackInfo.fromJson(data);
-    } catch (_) {
+      final track = TrackInfo.fromJson(data);
+      talker.info('⚡ CacheService: Hit for "$key" -> ${track.displayTitle}');
+      return track;
+    } catch (e, stack) {
+      talker.handle(e, stack, 'CacheService getCachedTrack error');
       return null;
     }
   }
@@ -40,7 +47,10 @@ class CacheService {
 
       // 3. Add to recents
       await _addToRecents(prefs, jsonString);
-    } catch (_) {}
+      talker.debug('CacheService: Saved track "${track.displayTitle}" to local cache');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'CacheService saveTrack error');
+    }
   }
 
   static Future<void> _addToRecents(SharedPreferences prefs, String jsonString) async {
@@ -75,16 +85,22 @@ class CacheService {
         } catch (_) {}
       }
       return result;
-    } catch (_) {
+    } catch (e, stack) {
+      talker.handle(e, stack, 'CacheService getRecentTracks error');
       return [];
     }
   }
 
   static Future<void> clearCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where((k) => k.startsWith(_trackCachePrefix) || k == _recentTracksKey);
-    for (final k in keys) {
-      await prefs.remove(k);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith(_trackCachePrefix) || k == _recentTracksKey);
+      for (final k in keys) {
+        await prefs.remove(k);
+      }
+      talker.warning('CacheService: Local track cache cleared');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'CacheService clearCache error');
     }
   }
 }

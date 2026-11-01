@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:talker_flutter/talker_flutter.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 import 'package:pulse_share/features/resolver/data/cache_service.dart';
 import 'package:pulse_share/features/settings/preferences_service.dart';
@@ -151,6 +153,33 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     const SnackBar(content: Text('Cache cleared!')),
                   );
                 }
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Talker In-App Logs Viewer
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.terminal_rounded, color: Colors.teal),
+              title: const Text('Talker Log Monitor'),
+              subtitle: const Text('View real-time resolution logs & errors'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TalkerScreen(
+                      talker: talker,
+                      theme: TalkerScreenTheme(
+                        backgroundColor: theme.colorScheme.surface,
+                        textColor: theme.colorScheme.onSurface,
+                        cardColor: theme.colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+                  ),
+                );
               },
             ),
           ],

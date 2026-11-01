@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 import 'package:pulse_share/core/models/track_info.dart';
 import 'package:pulse_share/features/resolver/data/resolver_orchestrator.dart';
@@ -76,10 +77,12 @@ class _TrackPreviewSheetState extends State<TrackPreviewSheet> {
       if (prefs.autoOpen) {
         final preferredLink = result.linkFor(prefs.preferredPlatform);
         if (preferredLink != null && preferredLink.isDirect) {
+          talker.info('TrackPreviewSheet: Auto-opening preferred app (${prefs.preferredPlatform.displayName})');
           _launchUrl(preferredLink.url);
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
+      talker.handle(e, stack, 'TrackPreviewSheet resolution error');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -89,15 +92,18 @@ class _TrackPreviewSheetState extends State<TrackPreviewSheet> {
   }
 
   Future<void> _launchUrl(String url) async {
+    talker.info('TrackPreviewSheet: Launching URL: $url');
     final uri = Uri.parse(url);
     try {
       final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!success && mounted) {
+        talker.warning('TrackPreviewSheet: launchUrl returned false for $url');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open the platform link')),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      talker.handle(e, stack, 'TrackPreviewSheet failed to launch URL: $url');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to launch: $e')),
@@ -107,6 +113,7 @@ class _TrackPreviewSheetState extends State<TrackPreviewSheet> {
   }
 
   void _copyToClipboard(String text, String label) {
+    talker.debug('TrackPreviewSheet: Copied $label link to clipboard ($text)');
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -117,6 +124,7 @@ class _TrackPreviewSheetState extends State<TrackPreviewSheet> {
   }
 
   void _shareAll(TrackInfo track) {
+    talker.info('TrackPreviewSheet: Sharing all platform links for "${track.displayTitle}"');
     final buffer = StringBuffer();
     buffer.writeln('🎵 Listen to "${track.title}" by ${track.artist}:');
     buffer.writeln();
