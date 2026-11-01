@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 
 class PreferencesService extends ChangeNotifier {
@@ -33,14 +34,18 @@ class PreferencesService extends ChangeNotifier {
       _geminiApiKey = prefs.getString(_keyGeminiApiKey);
       _autoOpen = prefs.getBool(_keyAutoOpen) ?? false;
       _isInitialized = true;
+      talker.debug(
+        'PreferencesService initialized: Preferred=${_preferredPlatform.displayName}, AutoOpen=$_autoOpen, HasGeminiKey=${_geminiApiKey != null}',
+      );
       notifyListeners();
-    } catch (e) {
-      debugPrint('PreferencesService init error: $e');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'PreferencesService init error');
     }
   }
 
   Future<void> setPreferredPlatform(PlatformType platform) async {
     _preferredPlatform = platform;
+    talker.info('PreferencesService: Preferred platform updated to ${platform.displayName}');
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyPreferredPlatform, platform.id);
@@ -49,6 +54,9 @@ class PreferencesService extends ChangeNotifier {
   Future<void> setGeminiApiKey(String? key) async {
     final clean = key?.trim();
     _geminiApiKey = clean == null || clean.isEmpty ? null : clean;
+    talker.info(
+      'PreferencesService: Gemini API key ${_geminiApiKey != null ? "configured" : "cleared"}',
+    );
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     if (_geminiApiKey != null) {
@@ -60,6 +68,7 @@ class PreferencesService extends ChangeNotifier {
 
   Future<void> setAutoOpen(bool enabled) async {
     _autoOpen = enabled;
+    talker.info('PreferencesService: Auto-open set to $enabled');
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAutoOpen, enabled);

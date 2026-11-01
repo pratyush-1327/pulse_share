@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 
 class OdesliResult {
@@ -30,7 +30,11 @@ class OdesliApiSource {
     'amazon': PlatformType.amazonMusic,
   };
 
-  static Future<OdesliResult?> fetchLinks(String url) async {
+  static Future<OdesliResult?> fetchLinks(
+    String url, {
+    PlatformType? platform,
+    String? trackId,
+  }) async {
     // 1. Try public API endpoint first
     try {
       final uri = Uri.parse(_apiBaseUrl).replace(queryParameters: {'url': url});
@@ -44,26 +48,43 @@ class OdesliApiSource {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        talker.info('OdesliApiSource: API returned 200 OK');
         return _parseApiResponse(data);
       }
     } catch (_) {}
 
-    // 2. Fallback: Parse Songlink Next.js data
+    // 2. Fallback: Parse Songlink Next.js data using canonical short URL where possible
     try {
-      final webUrl = 'https://song.link/$url';
+      String webUrl;
+      if (trackId != null && (platform == PlatformType.youtube || platform == PlatformType.youtubeMusic)) {
+        webUrl = 'https://song.link/y/$trackId';
+      } else if (trackId != null && platform == PlatformType.spotify) {
+        webUrl = 'https://song.link/s/$trackId';
+      } else {
+        webUrl = 'https://song.link/$url';
+      }
+
+      talker.debug('OdesliApiSource: Scraping Songlink page at $webUrl');
+
       final response = await _client.get(
         Uri.parse(webUrl),
         headers: {
           'User-Agent': 'Mozilla/5.0 (Linux; Android 14)',
           'Accept': 'text/html,application/xhtml+xml',
         },
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        return _parseWebPage(response.body);
+        final result = _parseWebPage(response.body);
+        if (result != null) {
+          talker.info(
+            'OdesliApiSource: Songlink parsed successfully! Found "${result.title}" by "${result.artist}" with ${result.directPlatformUrls.length} platform links',
+          );
+        }
+        return result;
       }
-    } catch (e) {
-      debugPrint('OdesliApiSource scrape fallback error: $e');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'OdesliApiSource scrape fallback error');
     }
 
     return null;
@@ -150,8 +171,8 @@ class OdesliApiSource {
         artworkUrl: artworkUrl,
         directPlatformUrls: platformUrls,
       );
-    } catch (e) {
-      debugPrint('Error parsing Songlink NEXT_DATA: $e');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'Error parsing Songlink NEXT_DATA');
       return null;
     }
   }

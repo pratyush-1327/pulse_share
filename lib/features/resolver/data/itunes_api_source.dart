@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:pulse_share/core/logging/app_logger.dart';
 
 class ItunesApiResult {
   final String title;
@@ -35,6 +35,8 @@ class ItunesApiSource {
         },
       );
 
+      talker.debug('ItunesApiSource: Searching "$query"');
+
       final response = await _client.get(
         uri,
         headers: {
@@ -43,11 +45,17 @@ class ItunesApiSource {
         },
       ).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        talker.warning('ItunesApiSource: Search returned HTTP ${response.statusCode}');
+        return null;
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final results = data['results'] as List<dynamic>?;
-      if (results == null || results.isEmpty) return null;
+      if (results == null || results.isEmpty) {
+        talker.debug('ItunesApiSource: No songs found for "$query"');
+        return null;
+      }
 
       // Select top result
       final top = results[0] as Map<String, dynamic>;
@@ -77,6 +85,8 @@ class ItunesApiSource {
         ).toString();
       }
 
+      talker.info('ItunesApiSource: Found "$trackName" by "$artistName" (Artwork 600x600 ready)');
+
       return ItunesApiResult(
         title: trackName,
         artist: artistName,
@@ -85,8 +95,8 @@ class ItunesApiSource {
         appleMusicUrl: cleanAppleUrl ?? trackViewUrl,
         previewAudioUrl: previewUrl,
       );
-    } catch (e) {
-      debugPrint('ItunesApiSource error: $e');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'ItunesApiSource search error');
       return null;
     }
   }
@@ -101,8 +111,13 @@ class ItunesApiSource {
         },
       );
 
+      talker.debug('ItunesApiSource: Looking up track ID $trackId');
+
       final response = await _client.get(uri).timeout(const Duration(seconds: 4));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        talker.warning('ItunesApiSource: Lookup returned HTTP ${response.statusCode}');
+        return null;
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final results = data['results'] as List<dynamic>?;
@@ -116,6 +131,8 @@ class ItunesApiSource {
       final rawArtwork = top['artworkUrl100'] as String?;
       final artworkUrl = rawArtwork?.replaceAll('100x100bb', '600x600bb');
 
+      talker.info('ItunesApiSource: ID lookup resolved "$trackName" by "$artistName"');
+
       return ItunesApiResult(
         title: trackName,
         artist: artistName,
@@ -124,7 +141,8 @@ class ItunesApiSource {
         appleMusicUrl: top['trackViewUrl'] as String?,
         previewAudioUrl: top['previewUrl'] as String?,
       );
-    } catch (_) {
+    } catch (e, stack) {
+      talker.handle(e, stack, 'ItunesApiSource lookupById error');
       return null;
     }
   }

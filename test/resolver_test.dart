@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 import 'package:pulse_share/core/models/track_info.dart';
 import 'package:pulse_share/features/resolver/data/fast_url_parser.dart';
@@ -6,6 +8,10 @@ import 'package:pulse_share/features/resolver/data/itunes_api_source.dart';
 import 'package:pulse_share/features/resolver/data/resolver_orchestrator.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
+  SharedPreferences.setMockInitialValues({});
+
   group('FastUrlParser Tests', () {
     test('Parses Spotify track URL correctly', () {
       final input = 'https://open.spotify.com/track/4cOdKLETKBW3PvgPWqT';
@@ -127,6 +133,18 @@ void main() {
       expect(track.platformLinks.containsKey(PlatformType.youtubeMusic), isTrue);
       expect(track.platformLinks.containsKey(PlatformType.youtube), isTrue);
       expect(track.platformLinks.containsKey(PlatformType.amazonMusic), isTrue);
+    });
+
+    test('ResolverOrchestrator resolves YouTube Music link: Cassie - Long Way 2 Go', () async {
+      final ytUrl = 'https://music.youtube.com/watch?v=4IVEM2g-26o&si=ynTIjqZXl3WoiJJj';
+      final track = await ResolverOrchestrator.resolve(rawInput: ytUrl);
+
+      expect(track.title.toLowerCase(), contains('long way 2 go'));
+      expect(track.artist.toLowerCase(), contains('cassie'));
+      expect(track.platformLinks[PlatformType.youtubeMusic]?.isDirect, isTrue);
+      expect(track.platformLinks[PlatformType.youtube]?.isDirect, isTrue);
+      expect(track.platformLinks[PlatformType.appleMusic]?.isDirect, isTrue);
+      expect(track.artworkUrl, isNotNull);
     });
   });
 }

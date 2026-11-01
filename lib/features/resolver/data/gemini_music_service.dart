@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 
 class GeminiParsedSong {
@@ -35,11 +35,13 @@ class GeminiMusicService {
         : _defaultApiKey.trim();
 
     if (apiKey.isEmpty) {
-      debugPrint('GeminiMusicService: No API key provided');
+      talker.debug('GeminiMusicService: No API key configured, skipping AI parse');
       return null;
     }
 
     try {
+      talker.info('🤖 GeminiMusicService: Requesting gemini-2.5-flash for "$rawInput"');
+
       final model = GenerativeModel(
         model: 'gemini-2.5-flash',
         apiKey: apiKey,
@@ -72,13 +74,17 @@ Respond ONLY with valid JSON in this exact structure:
           .timeout(const Duration(seconds: 5));
 
       final text = response.text;
-      if (text == null || text.trim().isEmpty) return null;
+      if (text == null || text.trim().isEmpty) {
+        talker.warning('GeminiMusicService: Empty response from Gemini API');
+        return null;
+      }
 
       final data = jsonDecode(text) as Map<String, dynamic>;
       final title = data['title'] as String?;
       final artist = data['artist'] as String?;
 
       if (title == null || title.isEmpty || artist == null || artist.isEmpty) {
+        talker.warning('GeminiMusicService: Response missing title or artist');
         return null;
       }
 
@@ -93,14 +99,16 @@ Respond ONLY with valid JSON in this exact structure:
         }
       });
 
+      talker.info('🤖 GeminiMusicService: Successfully extracted "$title" by "$artist" (${linksMap.length} direct links)');
+
       return GeminiParsedSong(
         title: title,
         artist: artist,
         album: data['album'] as String?,
         directLinks: linksMap,
       );
-    } catch (e) {
-      debugPrint('GeminiMusicService error: $e');
+    } catch (e, stack) {
+      talker.handle(e, stack, 'GeminiMusicService error');
       return null;
     }
   }
