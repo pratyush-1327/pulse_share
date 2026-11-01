@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:talker_flutter/talker_flutter.dart';
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/track_info.dart';
 import 'package:pulse_share/features/resolver/data/cache_service.dart';
 import '../widgets/track_preview_sheet.dart';
@@ -57,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final clean = input.trim();
     if (clean.isEmpty) return;
 
+    talker.info('HomeScreen: User initiated conversion for "$clean"');
+
     TrackPreviewSheet.show(context, input: clean).then((_) {
       _loadRecents();
     });
@@ -87,6 +91,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.terminal_rounded),
+            tooltip: 'Debug Logs',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TalkerScreen(
+                    talker: talker,
+                    theme: TalkerScreenTheme(
+                      backgroundColor: theme.colorScheme.surface,
+                      textColor: theme.colorScheme.onSurface,
+                      cardColor: theme.colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
