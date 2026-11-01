@@ -1,3 +1,4 @@
+import 'package:pulse_share/core/logging/app_logger.dart';
 import 'package:pulse_share/core/models/platform_type.dart';
 
 class ParsedInput {
@@ -47,6 +48,7 @@ class FastUrlParser {
     final urlMatch = _urlRegex.firstMatch(cleanInput);
 
     if (urlMatch == null) {
+      talker.debug('FastUrlParser: No URL detected in input text "$cleanInput"');
       return ParsedInput(rawInput: cleanInput);
     }
 
@@ -78,6 +80,10 @@ class FastUrlParser {
         }
       } catch (_) {}
     }
+
+    talker.debug(
+      'FastUrlParser: URL=$foundUrl | Platform=${detectedPlatform?.displayName ?? "Unknown"} | ID=$extractedId',
+    );
 
     return ParsedInput(
       rawInput: cleanInput,
